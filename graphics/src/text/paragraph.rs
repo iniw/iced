@@ -552,6 +552,31 @@ impl core::text::Paragraph for Paragraph {
         paragraph.selection = None;
     }
 
+    fn keep_selection(&mut self, previous: &Self) {
+        let Some(Selection { start, end, .. }) = previous.internal().selection else {
+            return;
+        };
+
+        let old = &previous.internal().buffer.lines;
+        let new = &self.internal().buffer.lines;
+
+        let unchanged = end.line < new.len()
+            && (0..end.line).all(|line| old[line].text() == new[line].text())
+            && new[end.line].text().get(..end.index) == old[end.line].text().get(..end.index);
+
+        if !unchanged {
+            return;
+        }
+
+        let paragraph = Arc::make_mut(&mut self.0);
+
+        paragraph.selection = Some(Selection {
+            start,
+            end,
+            regions: text::regions(&paragraph.buffer, start, end),
+        });
+    }
+
     fn selection(&self) -> &[Rectangle] {
         self.internal()
             .selection

@@ -597,8 +597,19 @@ where
             hint_factor: renderer.hint_factor(),
         };
 
+        // A new paragraph keeps the selection of the old one, if the selected
+        // text didn't change, for example because more text arrived or the
+        // color of a span changed.
+        let relayout = |paragraph: &mut Renderer::Paragraph| {
+            let previous = std::mem::replace(
+                paragraph,
+                Renderer::Paragraph::with_spans(text_with_spans()),
+            );
+            paragraph.keep_selection(&previous);
+        };
+
         if state.spans != spans {
-            state.paragraph = Renderer::Paragraph::with_spans(text_with_spans());
+            relayout(&mut state.paragraph);
             state.spans = spans.iter().cloned().map(Span::to_static).collect();
         } else {
             match state.paragraph.compare(core::Text {
@@ -619,7 +630,7 @@ where
                     state.paragraph.resize(bounds);
                 }
                 core::text::Difference::Shape => {
-                    state.paragraph = Renderer::Paragraph::with_spans(text_with_spans());
+                    relayout(&mut state.paragraph);
                 }
             }
         }

@@ -97,6 +97,14 @@ pub trait Paragraph: Sized + Default {
     // TODO: Make immutable
     fn copy(&mut self) -> Option<String>;
 
+    /// Takes over the selection of `previous`, if `previous` has the same text
+    /// as this [`Paragraph`] up to the end of its selection.
+    ///
+    /// A widget calls this when it lays out its text again, for example
+    /// because more text arrived or the color of the text changed, so that a
+    /// selection of text that didn't change survives.
+    fn keep_selection(&mut self, _previous: &Self) {}
+
     /// Returns the minimum width that can fit the contents of the [`Paragraph`].
     fn min_width(&self) -> f32 {
         self.min_bounds().width
@@ -130,7 +138,7 @@ impl<P: Paragraph> Plain<P> {
     pub fn update(&mut self, text: Text<&str>) -> bool {
         if self.content != text.content {
             text.content.clone_into(&mut self.content);
-            self.raw = P::with_text(text);
+            self.relayout(text);
             return true;
         }
 
@@ -141,10 +149,17 @@ impl<P: Paragraph> Plain<P> {
                 true
             }
             Difference::Shape => {
-                self.raw = P::with_text(text);
+                self.relayout(text);
                 true
             }
         }
+    }
+
+    /// Lays out the [`Paragraph`] again, keeping its selection if the selected
+    /// text didn't change.
+    fn relayout(&mut self, text: Text<&str>) {
+        let previous = std::mem::replace(&mut self.raw, P::with_text(text));
+        self.raw.keep_selection(&previous);
     }
 
     /// Returns the horizontal alignment of the [`Paragraph`].
